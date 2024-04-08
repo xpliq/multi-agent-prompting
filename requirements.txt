@@ -1,3 +1,6 @@
 pandas
 numpy
+openai
+asyncio
+dotenv
 -e .
