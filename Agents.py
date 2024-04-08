@@ -21,6 +21,12 @@ class Agent:
         self.current_partner = None
         self.conversation_history = []
 
+    def get_conversation_history(self):
+        conversation_str = "Conversation History for " + self.name + ":\n"
+        for resp in self.conversation_history:
+            conversation_str += resp + "\n"
+        return conversation_str
+
     async def genprompt(self):
         current_partner_sysprompt = getattr(self.current_partner, 'sysprompt', 'None')
         
@@ -55,7 +61,7 @@ class Agent:
                 max_tokens=150  # Adjust as necessary
             )
             
-            return response.choices[0].message.content
+            return response.choices[0].message.content.strip().replace('\n', '')
 
     async def reply(self, conversation, current_partner):
         instruction = "Please add your reply to the conversation. Only provide your response. Stay on Task. Respond using your specialization, memory, and expertise. Keep your responses relevant to your role and the ongoing discussion. Be detailed."
@@ -100,12 +106,12 @@ class Agent:
                 max_tokens=150  # Adjust as necessary
             )
         
-        response_output = response.choices[0].message.content.strip()
+        response_output = response.choices[0].message.content.strip().replace('\n', '')
         
         # Create parameters from the expanded prompt
         params_instruction = (
-            f"Based on the following prompt, list out the key topics that should be addressed. "
-            f"List the topics as a comma-separated list.\nExpanded Prompt: {response_output}"
+            f"Given the following prompt, list out the key topics that should be addressed. Only provide the topics in your response."
+            f"List the topics as a comma-separated list and do not number them.\nPrompt: {response_output}"
         )
         
         async with semaphore:
@@ -120,7 +126,7 @@ class Agent:
                 max_tokens=150  # Adjust as necessary
             )
         
-        topics_text = response.choices[0].message.content.strip()
+        topics_text = response.choices[0].message.content.strip().replace('\n', '')
         topics_list = [topic.strip() for topic in topics_text.split(',')]
         
         # Generate roles based on the topics
