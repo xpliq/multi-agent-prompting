@@ -1,1 +1,1 @@
-## Multi-Agent Personas for LLM Prompting
+## Multi-Agent Prompting for LLMs
