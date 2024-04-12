@@ -21,12 +21,14 @@ class Agent:
         self.current_partner = None
         self.conversation_history = []
 
+    # method to grab conversation history from an agent
     def get_conversation_history(self):
         conversation_str = "Conversation History for " + self.name + ":\n"
         for resp in self.conversation_history:
             conversation_str += resp + "\n"
         return conversation_str
 
+    # Structures a prompt from a template. Useful for models that benefit from more structural prompts
     async def genprompt(self):
         current_partner_sysprompt = getattr(self.current_partner, 'sysprompt', 'None')
         
@@ -36,16 +38,18 @@ class Agent:
                   f"Agent that you will collaborate with is: {self.current_partner}. This is your current "
                   f"partner's role: {current_partner_sysprompt}. ")
         
+        # ensuring the agent is aware of having a partner. Otherwise just introduce itself so that it understands themselves better
         if self.current_partner is None:
-            prompt += ("If you currently have no partner, introduce yourself and layout the foundation "
-                       "to how you would tackle the given task with your specialization and expertise. ")
+            prompt += ("If you currently have no partner, introduce yourself and layout the foundation to how you would tackle the given task with your specialization and expertise. ")
         else:
-            prompt += "Otherwise, if you do have a partner, just collaborate on the given task. "
-            
+            prompt += "Collaborate on the given task with your partner. "
+        
+        # adding more to the prompt for better understanding of who the agent is
         prompt += (f"This is your inner memory and past thoughts: {self.memory} "
                    f"Your conversation history: {self.conversation_history}")
         return prompt
 
+    # this generates responses from agent's model given a prompt
     async def instruct(self, instruction):
         async with semaphore:
             prompt = await self.genprompt() + f"\nInstruction: {instruction}"
@@ -57,21 +61,24 @@ class Agent:
             response = await self.client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=messages,
-                temperature=0.7,  # Adjust as necessary
-                max_tokens=150  # Adjust as necessary
+                temperature=0.9, 
+                max_tokens=150
             )
             
             return response.choices[0].message.content.strip().replace('\n', '')
 
+    # this particular method is to prompt an agent to reply to a given conversation
     async def reply(self, conversation, current_partner):
         instruction = "Please add your reply to the conversation. Only provide your response. Stay on Task. Respond using your specialization, memory, and expertise. Keep your responses relevant to your role and the ongoing discussion. Be detailed."
         return await self.instruct(instruction)
 
+    # agent's are to update their memory after each conversation/dialogue
     async def update_memory(self):
         instruction = "Reflect on the current conversation and task, and add to your internal thoughts anything new you've learned or plan to remember for future reference."
         new_memory = await self.instruct(instruction)
         self.memory.append(new_memory)
 
+    # looped for agents to collaborate through their entire generated path of agents
     async def collaborate_with(self, partner_agent):
         self.current_partner = partner_agent
         conversation_str = "\n".join(self.conversation_history)
@@ -85,11 +92,8 @@ class Agent:
         print(f"{partner_agent.name}: {their_response}")
         
         self.current_partner = None
-
-    def generate_path(self, agent_names):
-        self.path = [name for name in agent_names if name != self.name]
-        random.shuffle(self.path)
         
+    # generates the required parameters needed for multiple agents -- relative to a given user prompt
     async def process_prompt_to_roles(self, user_prompt):
         # Expand the prompt
         expanded_prompt_instruction = f"You will be given a prompt. Expand on the prompt and create a new prompt. This expanded task should delve deeper into the user's initial request, providing clarity, focus, and direction. Ensure your expansion maintains consistency with the original prompt and enhances its conciseness and specificity. You response should only be the new prompt, nothing else. \n User Prompt: {user_prompt}"
@@ -102,8 +106,8 @@ class Agent:
             response = await self.client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=messages,
-                temperature=0.7,  # Adjust as necessary
-                max_tokens=150  # Adjust as necessary
+                temperature=0.9,
+                max_tokens=150 
             )
         
         response_output = response.choices[0].message.content.strip().replace('\n', '')
@@ -122,8 +126,8 @@ class Agent:
             response = await self.client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=messages,
-                temperature=0.7,  # Adjust as necessary
-                max_tokens=150  # Adjust as necessary
+                temperature=0.9,
+                max_tokens=150 
             )
         
         topics_text = response.choices[0].message.content.strip().replace('\n', '')
@@ -134,7 +138,9 @@ class Agent:
 
         return response_output, topics_list, roles
 
+    # generates a path of collaboration for agent
     def generate_path(self, agent_names):
+        # this path is generated as a method to have multiple agent conversations happen at once to improve speed of conversation generation
         self.path = [name for name in agent_names if name != self.name]
         random.shuffle(self.path)
 
@@ -143,12 +149,14 @@ class Group:
         self.task = task
         self.agents = agents
 
+    # executes the generated path in that order
     async def execute_path(self, agent):
         await agent.update_memory()
         for partner_name in agent.path:
             partner_agent = next(a for a in self.agents if a.name == partner_name)
             await agent.collaborate_with(partner_agent)
 
+    # starts collaboration between all the agents
     async def conduct_collaborations(self):
         tasks = [self.execute_path(agent) for agent in self.agents]
         await asyncio.gather(*tasks)
