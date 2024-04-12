@@ -5,4 +5,5 @@ asyncio
 dotenv
 langchain_community
 langchain
+sentence_transformers
 -e .
