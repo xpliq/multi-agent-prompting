@@ -3,4 +3,6 @@ numpy
 openai
 asyncio
 dotenv
+langchain_community
+langchain
 -e .
